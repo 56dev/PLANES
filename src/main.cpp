@@ -6,6 +6,7 @@ float adjust_mouse(int, int);
 void draw_to_screen(RenderTexture2D, int, int, float);
 void render_plane();
 Camera3D init_camera();
+void update_camera(Camera3D &camera, Vector3 p);
 RenderTexture2D target{};
 
 struct artist {
@@ -67,6 +68,27 @@ struct artist {
 
 
 };
+struct plane {
+    Vector3 position{};
+    float yaw{};
+    float pitch{};
+    float roll{};
+    float forward_velocity{};
+
+    void update() {
+        position.z += 10.0f * GetFrameTime();
+    }
+    void render_plane() {
+        DrawCube(position, 2, 2, 4, RED);
+        DrawCubeWires(position, 2, 2, 4, BLACK);
+
+        DrawCube(position, 5, 0.5, 2, RED);
+        DrawCubeWires(position, 5, 0.5, 2, BLACK);
+
+        DrawCube(position + Vector3(0, 1.8, -2), 0.5, 2, 1, RED);
+        DrawCubeWires(position + Vector3(0, 1.8, -2), 0.5, 2, 1, BLACK);
+    }
+};
 int main() {
     constexpr int W{1920};
     constexpr int H{1080};
@@ -78,14 +100,17 @@ int main() {
     target = LoadRenderTexture(W, H);
     SetTextureFilter(target.texture, TEXTURE_FILTER_TRILINEAR);
     Camera3D camera{ init_camera() };
+    plane p{};
     while(!WindowShouldClose()) {
         float scale = adjust_mouse(W, H);
-        UpdateCamera(&camera, CAMERA_ORBITAL);
+        UpdateCamera(&camera, CAMERA_FREE);
         BeginTextureMode(target);
         ClearBackground(RAYWHITE);
         BeginMode3D(camera);
-            render_plane();
-            DrawGrid(10, 1.0f);
+            p.update();
+            p.render_plane();
+            update_camera(camera, p.position);
+            DrawGrid(10, 10.0f);
         EndMode3D();
         EndTextureMode();
         draw_to_screen(target, W, H, scale);
@@ -93,16 +118,10 @@ int main() {
     }
     return 0;
 }
-void render_plane() {
-    DrawCube(Vector3Zero(), 2, 2, 4, RED);
-    DrawCubeWires(Vector3Zero(), 2, 2, 4, BLACK);
-
-    DrawCube(Vector3Zero(), 5, 0.5, 2, RED);
-    DrawCubeWires(Vector3Zero(), 5, 0.5, 2, BLACK);
-
-    DrawCube(Vector3(0, 1.8, 2), 0.5, 2, 1, RED);
-    DrawCubeWires(Vector3(0, 1.8, 2), 0.5, 2, 1, BLACK);
+void update_camera(Camera3D &camera, Vector3 p) {
+    camera.target = p;
 }
+
 Camera3D init_camera() {
     Camera3D camera{};
     camera.position = (Vector3){10, 10, 10};
