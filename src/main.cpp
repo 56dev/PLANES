@@ -4,6 +4,8 @@
 
 float adjust_mouse(int, int);
 void draw_to_screen(RenderTexture2D, int, int, float);
+void render_plane();
+Camera3D init_camera();
 RenderTexture2D target{};
 
 struct artist {
@@ -75,21 +77,41 @@ int main() {
     SetTargetFPS(60);
     target = LoadRenderTexture(W, H);
     SetTextureFilter(target.texture, TEXTURE_FILTER_TRILINEAR);
-    artist ar{W, H};
+    Camera3D camera{ init_camera() };
     while(!WindowShouldClose()) {
         float scale = adjust_mouse(W, H);
+        UpdateCamera(&camera, CAMERA_ORBITAL);
         BeginTextureMode(target);
         ClearBackground(RAYWHITE);
-        ar.observe_mouse();
-        ar.draw_points();
+        BeginMode3D(camera);
+            render_plane();
+            DrawGrid(10, 1.0f);
+        EndMode3D();
         EndTextureMode();
         draw_to_screen(target, W, H, scale);
 
     }
     return 0;
 }
+void render_plane() {
+    DrawCube(Vector3Zero(), 2, 2, 4, RED);
+    DrawCubeWires(Vector3Zero(), 2, 2, 4, BLACK);
 
+    DrawCube(Vector3Zero(), 5, 0.5, 2, RED);
+    DrawCubeWires(Vector3Zero(), 5, 0.5, 2, BLACK);
 
+    DrawCube(Vector3(0, 1.8, 2), 0.5, 2, 1, RED);
+    DrawCubeWires(Vector3(0, 1.8, 2), 0.5, 2, 1, BLACK);
+}
+Camera3D init_camera() {
+    Camera3D camera{};
+    camera.position = (Vector3){10, 10, 10};
+    camera.target = (Vector3){0, 0, 0};
+    camera.up = (Vector3){0.0f, 1.0f, 0.0f};
+    camera.fovy = 45.0f;
+    camera.projection = CAMERA_PERSPECTIVE;
+    return camera;
+}
 
 float adjust_mouse(int game_screen_width, int game_screen_height) {
     #define MIN(a,b) ((a) < (b) ? (a) : (b))
