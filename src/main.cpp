@@ -8,7 +8,10 @@ void render_plane();
 Camera3D init_camera();
 void update_camera(Camera3D &camera, Vector3 p);
 RenderTexture2D target{};
-
+enum class FlyState {
+    DRAW,
+    FLY
+};
 struct artist {
     std::vector<Vector2> points{};
     float canvas_W{};
@@ -81,6 +84,11 @@ struct artist {
         }
     }
 
+    bool is_line_done_drawing() {
+        return points.size() > 0 && IsMouseButtonUp(MOUSE_BUTTON_LEFT);
+
+    }
+
 
 };
 struct plane {
@@ -117,14 +125,23 @@ int main() {
     Camera3D camera{ init_camera() };
     artist a{W, H, true, (Vector2){W/2, H/2}};
     plane p{};
+    FlyState fly_state = FlyState::DRAW;
     while(!WindowShouldClose()) {
         float scale = adjust_mouse(W, H);
         UpdateCamera(&camera, CAMERA_THIRD_PERSON);
         BeginTextureMode(target);
         ClearBackground(RAYWHITE);
+        if(fly_state == FlyState::DRAW) {
+
+        } else if (fly_state == FlyState::FLY) {
+
+        }
         a.observe_mouse();
         a.draw_points();
         DrawCircleV((Vector2){W/2, H/2}, 2.0f, BLUE);
+        if(a.is_line_done_drawing()) {
+            DrawText("OK / CANCEL", 0, 0, 100, BLACK);
+        }
         /*BeginMode3D(camera);
             p.update();
             p.render_plane();
