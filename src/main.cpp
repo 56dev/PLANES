@@ -13,7 +13,9 @@ struct artist {
     std::vector<Vector2> points{};
     float canvas_W{};
     float canvas_H{};
-    artist(float W, float H) : canvas_W{W}, canvas_H{H} {
+    bool should_lock_starting_point{true};
+    Vector2 locked_starting_point{};
+    artist(float W, float H, bool slsp=true, Vector2 lsp=(Vector2){0, 0}) : canvas_W{W}, canvas_H{H}, should_lock_starting_point{slsp}, locked_starting_point{lsp} {
 
     }
     bool was_mouse_released{true};
@@ -31,11 +33,24 @@ struct artist {
     bool is_the_mouse_in_bounds() {
         return CheckCollisionPointRec(GetMousePosition(), (Rectangle){0, 0, canvas_W, canvas_H});
     }
+    bool is_mouse_near_the_locked_starting_point() {
+        constexpr float max_distance{50};
+        return Vector2DistanceSqr(GetMousePosition(), locked_starting_point) <= max_distance*max_distance;
+    }
     void add_points() {
+        if(should_lock_starting_point) {
+            if(points.size() == 0) {
+                if(is_mouse_near_the_locked_starting_point()) {
+                    points.push_back(locked_starting_point);
+                }
+                return;
+            }
+        }
         if(is_the_mouse_too_near_to_the_previous_point() == false && is_the_line_too_long() == false && is_the_mouse_in_bounds() == true) {
             points.push_back(GetMousePosition());
         }
     }
+
     void observe_mouse() {
         if(IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             if(was_mouse_released == true) {
@@ -100,18 +115,22 @@ int main() {
     target = LoadRenderTexture(W, H);
     SetTextureFilter(target.texture, TEXTURE_FILTER_TRILINEAR);
     Camera3D camera{ init_camera() };
+    artist a{W, H, true, (Vector2){W/2, H/2}};
     plane p{};
     while(!WindowShouldClose()) {
         float scale = adjust_mouse(W, H);
-        UpdateCamera(&camera, CAMERA_FREE);
+        UpdateCamera(&camera, CAMERA_THIRD_PERSON);
         BeginTextureMode(target);
         ClearBackground(RAYWHITE);
-        BeginMode3D(camera);
+        a.observe_mouse();
+        a.draw_points();
+        DrawCircleV((Vector2){W/2, H/2}, 2.0f, BLUE);
+        /*BeginMode3D(camera);
             p.update();
             p.render_plane();
             update_camera(camera, p.position);
-            DrawGrid(10, 10.0f);
-        EndMode3D();
+            DrawGrid(1000, 10.0f);
+        EndMode3D();*/
         EndTextureMode();
         draw_to_screen(target, W, H, scale);
 
