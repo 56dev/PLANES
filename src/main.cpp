@@ -1,5 +1,7 @@
 #include <raylib.h>
 #include <raymath.h>
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
 #include <vector>
 
 float adjust_mouse(int, int);
@@ -21,7 +23,7 @@ struct artist {
     artist(float W, float H, bool slsp=true, Vector2 lsp=(Vector2){0, 0}) : canvas_W{W}, canvas_H{H}, should_lock_starting_point{slsp}, locked_starting_point{lsp} {
 
     }
-    bool was_mouse_released{true};
+    bool drawing_allowed{true};
     bool is_the_mouse_too_near_to_the_previous_point() {
         if(points.size() == 0) {
             return false;
@@ -55,16 +57,16 @@ struct artist {
     }
 
     void observe_mouse() {
-        if(IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            if(was_mouse_released == true) {
-                was_mouse_released = false;
-                points.clear();
-            }
+        if(IsMouseButtonDown(MOUSE_BUTTON_LEFT) && drawing_allowed) {
             add_points();
         }
-        if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-            was_mouse_released = true;
+        if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && points.size() > 0) {
+            drawing_allowed = false;
         }
+    }
+    void reset() {
+        drawing_allowed = true;
+        points.clear();
     }
     #define px *1
     #define m *10
@@ -85,8 +87,7 @@ struct artist {
     }
 
     bool is_line_done_drawing() {
-        return points.size() > 0 && IsMouseButtonUp(MOUSE_BUTTON_LEFT);
-
+        return drawing_allowed == false;
     }
 
 
@@ -115,6 +116,7 @@ struct plane {
 int main() {
     constexpr int W{1920};
     constexpr int H{1080};
+    constexpr Vector2 center{W/2, H/2};
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_WINDOW_MAXIMIZED );
     InitWindow(W, H, "PLANES!!");
     InitAudioDevice();
@@ -123,7 +125,7 @@ int main() {
     target = LoadRenderTexture(W, H);
     SetTextureFilter(target.texture, TEXTURE_FILTER_TRILINEAR);
     Camera3D camera{ init_camera() };
-    artist a{W, H, true, (Vector2){W/2, H/2}};
+    artist a{W, H, true, center};
     plane p{};
     FlyState fly_state = FlyState::DRAW;
     while(!WindowShouldClose()) {
@@ -138,9 +140,24 @@ int main() {
         }
         a.observe_mouse();
         a.draw_points();
-        DrawCircleV((Vector2){W/2, H/2}, 2.0f, BLUE);
+        DrawCircleV(center, 2.0f, BLUE);
         if(a.is_line_done_drawing()) {
             DrawText("OK / CANCEL", 0, 0, 100, BLACK);
+            Vector2 button_dims{50, 20};
+            Rectangle button_1{
+                center.x - button_dims.x,
+                center.y + button_dims.y,
+                button_dims.x, button_dims.y
+                };
+            Rectangle button_2{
+                center.x + button_dims.x,
+                center.y + button_dims.y,
+                button_dims.x, button_dims.y
+            };
+            GuiButton(button_1, "OK");
+            if(GuiButton(button_2, "CANCEL")) {
+                a.reset();
+            }
         }
         /*BeginMode3D(camera);
             p.update();
