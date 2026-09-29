@@ -1,5 +1,6 @@
 #include <raylib.h>
 #include <raymath.h>
+#include <rlgl.h>
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 #include <vector>
@@ -53,6 +54,7 @@ struct artist {
         }
         if(is_the_mouse_too_near_to_the_previous_point() == false && is_the_line_too_long() == false && is_the_mouse_in_bounds() == true) {
             points.push_back(GetMousePosition());
+
         }
     }
 
@@ -98,19 +100,19 @@ struct plane {
     float pitch{};
     float roll{};
     float forward_velocity{};
-
     void update() {
         position.z += 10.0f * GetFrameTime();
     }
     void render_plane() {
-        DrawCube(position, 2, 2, 4, RED);
-        DrawCubeWires(position, 2, 2, 4, BLACK);
+        static Vector3 up{0, 1, 0};
+        static Vector3 right{1, 0, 0};
+        static Vector3 forward{0, 0, 1};
+        DrawLine3D(position, position + up*10, GREEN);
+        DrawLine3D(position, position + right*10, BLUE);
+        DrawLine3D(position, position + forward*10, RED);
+        DrawSphere(position, 1.0f, BLACK);
 
-        DrawCube(position, 5, 0.5, 2, RED);
-        DrawCubeWires(position, 5, 0.5, 2, BLACK);
 
-        DrawCube(position + Vector3(0, 1.8, -2), 0.5, 2, 1, RED);
-        DrawCubeWires(position + Vector3(0, 1.8, -2), 0.5, 2, 1, BLACK);
     }
 };
 int main() {
@@ -130,41 +132,42 @@ int main() {
     FlyState fly_state = FlyState::DRAW;
     while(!WindowShouldClose()) {
         float scale = adjust_mouse(W, H);
-        UpdateCamera(&camera, CAMERA_THIRD_PERSON);
         BeginTextureMode(target);
         ClearBackground(RAYWHITE);
         if(fly_state == FlyState::DRAW) {
-
-        } else if (fly_state == FlyState::FLY) {
-
-        }
-        a.observe_mouse();
-        a.draw_points();
-        DrawCircleV(center, 2.0f, BLUE);
-        if(a.is_line_done_drawing()) {
-            DrawText("OK / CANCEL", 0, 0, 100, BLACK);
-            Vector2 button_dims{50, 20};
-            Rectangle button_1{
-                center.x - button_dims.x,
-                center.y + button_dims.y,
-                button_dims.x, button_dims.y
+            a.observe_mouse();
+            a.draw_points();
+            DrawCircleV(center, 2.0f, BLUE);
+            if(a.is_line_done_drawing()) {
+                DrawText("OK / CANCEL", 0, 0, 100, BLACK);
+                Vector2 button_dims{50, 20};
+                Rectangle button_1{
+                    center.x - button_dims.x,
+                    center.y + button_dims.y,
+                    button_dims.x, button_dims.y
+                    };
+                Rectangle button_2{
+                    center.x + button_dims.x,
+                    center.y + button_dims.y,
+                    button_dims.x, button_dims.y
                 };
-            Rectangle button_2{
-                center.x + button_dims.x,
-                center.y + button_dims.y,
-                button_dims.x, button_dims.y
-            };
-            GuiButton(button_1, "OK");
-            if(GuiButton(button_2, "CANCEL")) {
-                a.reset();
-            }
+                if(GuiButton(button_1, "OK")) {
+                    fly_state = FlyState::FLY;
+                }
+                if(GuiButton(button_2, "CANCEL")) {
+                    a.reset();
+                }
         }
-        /*BeginMode3D(camera);
-            p.update();
-            p.render_plane();
-            update_camera(camera, p.position);
-            DrawGrid(1000, 10.0f);
-        EndMode3D();*/
+        } else if (fly_state == FlyState::FLY) {
+            BeginMode3D(camera);
+                p.update();
+                p.render_plane();
+                update_camera(camera, p.position);
+                DrawGrid(1000, 10.0f);
+            EndMode3D();
+        }
+
+
         EndTextureMode();
         draw_to_screen(target, W, H, scale);
 
@@ -173,6 +176,7 @@ int main() {
 }
 void update_camera(Camera3D &camera, Vector3 p) {
     camera.target = p;
+    camera.position = (Vector3){0, 10, -20} + p;
 }
 
 Camera3D init_camera() {
