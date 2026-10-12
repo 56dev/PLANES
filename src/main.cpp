@@ -104,8 +104,21 @@ struct plane {
     float pitch{};
     float roll{};
     float forward_velocity{};
+    std::vector<Vector2> points{};
+    int idx_of_next_point{0};
     void update() {
-        position.z += 10.0f * GetFrameTime();
+        if(idx_of_next_point < points.size() - 1) {
+            Vector2 next_point = points[idx_of_next_point];
+            if(Vector3DistanceSqr(Vector3{position.x, 0, position.z}, Vector3{next_point.y, 0, next_point.x}) < 10 * 10) {
+                ++idx_of_next_point;
+            }
+            float angle = atan2f(next_point.y - position.x, next_point.x - position.z);
+            Vector2 vec = Vector2{sin(angle), cos(angle)};
+            position += Vector3{vec.x, 0, vec.y} * 10.0f * GetFrameTime();
+        }
+
+
+
     }
     void render_plane() {
         static Vector3 up{0, 1, 0};
@@ -115,6 +128,7 @@ struct plane {
         DrawLine3D(position, position + right*10, BLUE);
         DrawLine3D(position, position + forward*10, RED);
         DrawSphere(position, 1.0f, BLACK);
+
 
 
     }
@@ -163,6 +177,7 @@ int main() {
                     fly_state = FlyState::FLY;
                     std::vector<Vector2> points = a.return_points();
                     points_on_world = map_artist_points_onto_world(points);
+                    p.points = points_on_world;
                 }
                 if(GuiButton(button_2, "CANCEL")) {
                     a.reset();
@@ -198,7 +213,7 @@ std::vector<Vector2> map_artist_points_onto_world(std::vector<Vector2>& artist_p
     for(std::size_t i = 0; i < artist_points.size(); ++i) {
         float x = artist_points[i].x;
         float y = artist_points[i].y;
-        result.push_back(Vector2{x - 1920 / 2, -(y - 1080 / 2)});
+        result.push_back(Vector2{x - 1920 / 2, -y + 1080 / 2});
     }
     return result;
 
