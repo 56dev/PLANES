@@ -100,21 +100,37 @@ struct artist {
 };
 struct plane {
     Vector3 position{};
+    // all in radians
     float yaw{};
     float pitch{};
     float roll{};
     float forward_velocity{};
     std::vector<Vector2> points{};
     int idx_of_next_point{0};
+    Vector3 forward_vec{};
     void update() {
         if(idx_of_next_point < points.size() - 1) {
             Vector2 next_point = points[idx_of_next_point];
             if(Vector3DistanceSqr(Vector3{position.x, 0, position.z}, Vector3{next_point.y, 0, next_point.x}) < 10 * 10) {
                 ++idx_of_next_point;
             }
-            float angle = atan2f(next_point.y - position.x, next_point.x - position.z);
-            Vector2 vec = Vector2{sin(angle), cos(angle)};
-            position += Vector3{vec.x, 0, vec.y} * 10.0f * GetFrameTime();
+            float needed_angle = atan2f(next_point.y - position.x, next_point.x - position.z);
+            float yaw_speed = 1.0f;
+            float epsilon = 2.0f;
+            if(abs(yaw - needed_angle) > epsilon) {
+                if(needed_angle < yaw) {
+                    DrawText(TextFormat("TURNING LEFT, angle needed: %.5f, yaw: %.5f", needed_angle, yaw), 0, 0, 100, BLACK);
+                    yaw -= yaw_speed * GetFrameTime();
+                }
+                else if (needed_angle > yaw) {
+                    DrawText(TextFormat("TURNING RIGHT, angle needed: %.5f, yaw: %.5f", needed_angle, yaw), 0, 0, 100, BLACK);
+                    yaw += yaw_speed * GetFrameTime();
+                }
+            }
+//            yaw = needed_angle;
+            Vector2 vec = Vector2{sin(yaw), cos(yaw)};
+            forward_vec =Vector3{vec.x, 0, vec.y};
+            position += forward_vec * 10.0f * GetFrameTime();
         }
 
 
@@ -127,6 +143,7 @@ struct plane {
         DrawLine3D(position, position + up*10, GREEN);
         DrawLine3D(position, position + right*10, BLUE);
         DrawLine3D(position, position + forward*10, RED);
+        DrawLine3D(position, position + forward_vec*30, PURPLE);
         DrawSphere(position, 1.0f, BLACK);
 
 
@@ -189,7 +206,8 @@ int main() {
                 p.render_plane();
                 update_camera(camera, p.position);
                 for(std::size_t i = 0; i < points_on_world.size(); ++i) {
-                    DrawSphere(Vector3{points_on_world[i].y, 0, points_on_world[i].x}, 3.0f, GREEN);
+                    Color col = p.idx_of_next_point == i ? RED : GREEN;
+                    DrawSphere(Vector3{points_on_world[i].y, 0, points_on_world[i].x}, 3.0f, col);
                 }
                 DrawGrid(1000, 10.0f);
             EndMode3D();
