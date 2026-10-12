@@ -10,6 +10,7 @@ void draw_to_screen(RenderTexture2D, int, int, float);
 void render_plane();
 Camera3D init_camera();
 void update_camera(Camera3D &camera, Vector3 p);
+std::vector<Vector2> map_artist_points_onto_world(std::vector<Vector2>&);
 RenderTexture2D target{};
 enum class FlyState {
     DRAW,
@@ -91,6 +92,9 @@ struct artist {
     bool is_line_done_drawing() {
         return drawing_allowed == false;
     }
+    std::vector<Vector2> return_points() {
+        return points;
+    }
 
 
 };
@@ -129,11 +133,14 @@ int main() {
     Camera3D camera{ init_camera() };
     artist a{W, H, true, center};
     plane p{};
-    FlyState fly_state = FlyState::DRAW;
+    FlyState fly_state{FlyState::DRAW};
+    std::vector<Vector2> points_on_world{};
+
     while(!WindowShouldClose()) {
         float scale = adjust_mouse(W, H);
         BeginTextureMode(target);
         ClearBackground(RAYWHITE);
+
         if(fly_state == FlyState::DRAW) {
             a.observe_mouse();
             a.draw_points();
@@ -151,8 +158,11 @@ int main() {
                     center.y + button_dims.y,
                     button_dims.x, button_dims.y
                 };
+
                 if(GuiButton(button_1, "OK")) {
                     fly_state = FlyState::FLY;
+                    std::vector<Vector2> points = a.return_points();
+                    points_on_world = map_artist_points_onto_world(points);
                 }
                 if(GuiButton(button_2, "CANCEL")) {
                     a.reset();
@@ -163,6 +173,9 @@ int main() {
                 p.update();
                 p.render_plane();
                 update_camera(camera, p.position);
+                for(std::size_t i = 0; i < points_on_world.size(); ++i) {
+                    DrawSphere(Vector3{points_on_world[i].y, 0, points_on_world[i].x}, 3.0f, GREEN);
+                }
                 DrawGrid(1000, 10.0f);
             EndMode3D();
         }
@@ -174,8 +187,26 @@ int main() {
     }
     return 0;
 }
+
+std::vector<Vector2> map_artist_points_onto_world(std::vector<Vector2>& artist_points) {
+    /*
+        The artist has a rectangular canvas of size 1920 by 1080 pixels, with (0, 0) in the upper left corner.
+        The world, for simplicity's sake, shall also have dimensions 1920 by 1080 units, but (0, 0) is right in the middle.
+        Therefore, the points will need to be translated left 1920 / 2, and up 1080 / 2
+    */
+   std::vector<Vector2> result{};
+    for(std::size_t i = 0; i < artist_points.size(); ++i) {
+        float x = artist_points[i].x;
+        float y = artist_points[i].y;
+        result.push_back(Vector2{x - 1920 / 2, -(y - 1080 / 2)});
+    }
+    return result;
+
+}
 void update_camera(Camera3D &camera, Vector3 p) {
     camera.target = p;
+    UpdateCamera(&camera, CAMERA_THIRD_PERSON);
+    return;
     camera.position = (Vector3){0, 10, -20} + p;
 }
 
