@@ -71,8 +71,6 @@ struct artist {
         drawing_allowed = true;
         points.clear();
     }
-    #define px *1
-    #define m *10
 
     void draw_points() {
         if(points.size() == 0) {
@@ -98,7 +96,10 @@ struct artist {
 
 
 };
-struct plane {
+class plane {
+private:
+    float needed_angle{};
+public:
     Vector3 position{};
     // all in radians
     float yaw{};
@@ -108,22 +109,26 @@ struct plane {
     std::vector<Vector2> points{};
     int idx_of_next_point{0};
     Vector3 forward_vec{};
+    char yaw_debug_text[100];
+
     void update() {
         if(idx_of_next_point < points.size() - 1) {
             Vector2 next_point = points[idx_of_next_point];
             if(Vector3DistanceSqr(Vector3{position.x, 0, position.z}, Vector3{next_point.y, 0, next_point.x}) < 10 * 10) {
                 ++idx_of_next_point;
             }
-            float needed_angle = atan2f(next_point.y - position.x, next_point.x - position.z);
+            needed_angle = atan2f(next_point.y - position.x, next_point.x - position.z);
             float yaw_speed = 1.0f;
             float epsilon = 2.0f;
             if(abs(yaw - needed_angle) > epsilon) {
                 if(needed_angle < yaw) {
-                    DrawText(TextFormat("TURNING LEFT, angle needed: %.5f, yaw: %.5f", needed_angle, yaw), 0, 0, 100, BLACK);
+                    const char *d = TextFormat("TURNING LEFT, angle needed: %.5f, yaw: %.5f", needed_angle, yaw);
+                    strncpy(yaw_debug_text, d, 100);
                     yaw -= yaw_speed * GetFrameTime();
                 }
                 else if (needed_angle > yaw) {
-                    DrawText(TextFormat("TURNING RIGHT, angle needed: %.5f, yaw: %.5f", needed_angle, yaw), 0, 0, 100, BLACK);
+                    const char *d = TextFormat("TURNING RIGHT, angle needed: %.5f, yaw: %.5f", needed_angle, yaw);
+                    strncpy(yaw_debug_text, d, 100);
                     yaw += yaw_speed * GetFrameTime();
                 }
             }
@@ -211,6 +216,8 @@ int main() {
                 }
                 DrawGrid(1000, 10.0f);
             EndMode3D();
+            DrawText(p.yaw_debug_text, 0, 0, 30, BLACK);
+
         }
 
 
@@ -273,6 +280,7 @@ float adjust_mouse(int game_screen_width, int game_screen_height) {
     #undef MIN
     return scale;
 }
+
 void draw_to_screen(RenderTexture2D target, int game_screen_width, int game_screen_height, float scale) {
     BeginDrawing();
     ClearBackground(BLACK);
