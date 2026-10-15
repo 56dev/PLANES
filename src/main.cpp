@@ -118,19 +118,52 @@ public:
                 ++idx_of_next_point;
             }
             needed_angle = atan2f(next_point.y - position.x, next_point.x - position.z);
-            float yaw_speed = 1.0f;
-            float epsilon = 2.0f;
-            if(abs(yaw - needed_angle) > epsilon) {
-                if(needed_angle < yaw) {
-                    const char *d = TextFormat("TURNING LEFT, angle needed: %.5f, yaw: %.5f", needed_angle, yaw);
+            float yaw_speed = 0.1f;
+            float epsilon = 0.1f;
+            int dir = 1;
+            float ang_dist = 0; //should always be less than 3.1415.
+            if(yaw < 0 && needed_angle > 0) {
+                float left = needed_angle - yaw;
+                float right = PI - needed_angle + PI + yaw;
+                if(left < right) {
+                    dir = -1;
+                    ang_dist = left;
+                } else if(right < left) {
+                    dir = 1;
+                    ang_dist = right;
+                }
+            } else if (yaw > 0 && needed_angle < 0) {
+                float left = yaw - needed_angle;
+                float right = PI - yaw + PI + needed_angle;
+                if(left < right) {
+                    dir = -1;
+                    ang_dist = left;
+                } else if(right < left) {
+                    dir = 1;
+                    ang_dist = right;
+                }
+
+            } else {
+                ang_dist = abs(yaw - needed_angle);
+                if(yaw > needed_angle) {
+                    dir = -1;
+                } else {
+                    dir = 1;
+                }
+            }
+            if(abs(ang_dist) > epsilon) {
+                if(dir < 0) {
+                    const char *d = TextFormat("TURNING LEFT, angle needed: %.5f, yaw: %.5f, ang_dist: %.5f", needed_angle, yaw, ang_dist);
                     strncpy(yaw_debug_text, d, 100);
                     yaw -= yaw_speed * GetFrameTime();
                 }
-                else if (needed_angle > yaw) {
-                    const char *d = TextFormat("TURNING RIGHT, angle needed: %.5f, yaw: %.5f", needed_angle, yaw);
+                else if (dir > 0) {
+                    const char *d = TextFormat("TURNING RIGHT, angle needed: %.5f, yaw: %.5f, ang_dist: %.5f", needed_angle, yaw, ang_dist);
                     strncpy(yaw_debug_text, d, 100);
                     yaw += yaw_speed * GetFrameTime();
                 }
+            } else {
+                strncpy(yaw_debug_text, "going straight", 100);
             }
 //            yaw = needed_angle;
             Vector2 vec = Vector2{sin(yaw), cos(yaw)};
@@ -213,6 +246,7 @@ int main() {
                 for(std::size_t i = 0; i < points_on_world.size(); ++i) {
                     Color col = p.idx_of_next_point == i ? RED : GREEN;
                     DrawSphere(Vector3{points_on_world[i].y, 0, points_on_world[i].x}, 3.0f, col);
+                    DrawCircle3D(Vector3{points_on_world[i].y, 0, points_on_world[i].x}, 10.0f, (Vector3){1.0, 0.0, 0.0f}, 90,BLACK);
                 }
                 DrawGrid(1000, 10.0f);
             EndMode3D();
