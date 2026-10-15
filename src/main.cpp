@@ -118,13 +118,13 @@ public:
                 ++idx_of_next_point;
             }
             needed_angle = atan2f(next_point.y - position.x, next_point.x - position.z);
-            float yaw_speed = 0.1f;
+            float yaw_speed = 2.1f;
             float epsilon = 0.1f;
             int dir = 1;
             float ang_dist = 0; //should always be less than 3.1415.
             if(yaw < 0 && needed_angle > 0) {
-                float left = needed_angle - yaw;
-                float right = PI - needed_angle + PI + yaw;
+                float right = needed_angle - yaw;
+                float left = PI - needed_angle + PI + yaw;
                 if(left < right) {
                     dir = -1;
                     ang_dist = left;
@@ -162,9 +162,9 @@ public:
                     strncpy(yaw_debug_text, d, 100);
                     yaw += yaw_speed * GetFrameTime();
                 }
-            } else {
-                strncpy(yaw_debug_text, "going straight", 100);
-            }
+            } //else {
+                //strncpy(yaw_debug_text, "going straight", 100);
+            //}
 //            yaw = needed_angle;
             Vector2 vec = Vector2{sin(yaw), cos(yaw)};
             forward_vec =Vector3{vec.x, 0, vec.y};
@@ -182,6 +182,7 @@ public:
         DrawLine3D(position, position + right*10, BLUE);
         DrawLine3D(position, position + forward*10, RED);
         DrawLine3D(position, position + forward_vec*30, PURPLE);
+        DrawLine3D(position,position +  Vector3{sin(needed_angle), 0, cos(needed_angle)}* 50, BLACK);
         DrawSphere(position, 1.0f, BLACK);
 
 
