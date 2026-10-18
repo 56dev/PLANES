@@ -122,6 +122,14 @@ public:
             float epsilon = 0.1f;
             int dir = 1;
             float ang_dist = 0; //should always be less than 3.1415.
+
+            //restrict the range of yaw to [-PI, PI], since atan2f's range is that interval.
+            while(yaw < -PI) {
+                yaw += 2 * PI;
+            }
+            while(yaw > PI) {
+                yaw -= 2 * PI;
+            }
             if(yaw < 0 && needed_angle > 0) {
                 float right = needed_angle - yaw;
                 float left = PI - needed_angle + PI + yaw;
