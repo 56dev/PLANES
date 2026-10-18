@@ -7,6 +7,7 @@
 
 float adjust_mouse(int, int);
 void draw_to_screen(RenderTexture2D, int, int, float);
+void init_window(const int W, const int H);
 void render_plane();
 Camera3D init_camera();
 void update_camera(Camera3D &camera, Vector3 p);
@@ -107,9 +108,12 @@ public:
     float roll{};
     float forward_velocity{};
     std::vector<Vector2> points{};
+    float angular_acceleration{};
+    float yaw_angular_speed{};
     int idx_of_next_point{0};
     Vector3 forward_vec{};
     char yaw_debug_text[100];
+    float plane_velocity{10.0f};
 
     void update() {
         if(idx_of_next_point < points.size() - 1) {
@@ -118,7 +122,6 @@ public:
                 ++idx_of_next_point;
             }
             needed_angle = atan2f(next_point.y - position.x, next_point.x - position.z);
-            float yaw_speed = 2.1f;
             float epsilon = 0.1f;
             int dir = 1;
             float ang_dist = 0; //should always be less than 3.1415.
@@ -159,24 +162,34 @@ public:
                     dir = 1;
                 }
             }
+            float needed_yaw_speed = 2.1f;
+            needed_yaw_speed *= dir;
+            if(yaw_angular_speed > needed_yaw_speed) {
+                angular_acceleration = -.1f;
+            } else if (yaw_angular_speed < needed_yaw_speed) {
+                angular_acceleration = .1f;
+            }
+            //if(yaw_angular_speed > needed_yaw_speed) {
+                //angular_acceleration = -0.1f;
+            //} else if (yaw_angular_speed < needed_yaw_speed) {
+                //angular_acceleration = 0.1f;
+            //}
+            yaw_angular_speed += angular_acceleration * GetFrameTime();
             if(abs(ang_dist) > epsilon) {
                 if(dir < 0) {
                     const char *d = TextFormat("TURNING LEFT, angle needed: %.5f, yaw: %.5f, ang_dist: %.5f", needed_angle, yaw, ang_dist);
                     strncpy(yaw_debug_text, d, 100);
-                    yaw -= yaw_speed * GetFrameTime();
                 }
                 else if (dir > 0) {
                     const char *d = TextFormat("TURNING RIGHT, angle needed: %.5f, yaw: %.5f, ang_dist: %.5f", needed_angle, yaw, ang_dist);
                     strncpy(yaw_debug_text, d, 100);
-                    yaw += yaw_speed * GetFrameTime();
                 }
-            } //else {
-                //strncpy(yaw_debug_text, "going straight", 100);
-            //}
-//            yaw = needed_angle;
+            }
+
+                yaw += yaw_angular_speed * GetFrameTime();
             Vector2 vec = Vector2{sin(yaw), cos(yaw)};
             forward_vec =Vector3{vec.x, 0, vec.y};
-            position += forward_vec * 10.0f * GetFrameTime();
+            position += forward_vec * plane_velocity * GetFrameTime();
         }
 
 
@@ -201,18 +214,15 @@ int main() {
     constexpr int W{1920};
     constexpr int H{1080};
     constexpr Vector2 center{W/2, H/2};
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_WINDOW_MAXIMIZED );
-    InitWindow(W, H, "PLANES!!");
-    InitAudioDevice();
-    SetWindowMinSize(640, 360);
-    SetTargetFPS(60);
-    target = LoadRenderTexture(W, H);
-    SetTextureFilter(target.texture, TEXTURE_FILTER_TRILINEAR);
+    init_window(W, H);
+
     Camera3D camera{ init_camera() };
+
     artist a{W, H, true, center};
-    plane p{};
-    FlyState fly_state{FlyState::DRAW};
     std::vector<Vector2> points_on_world{};
+    plane p{};
+
+    FlyState fly_state{FlyState::DRAW};
 
     while(!WindowShouldClose()) {
         float scale = adjust_mouse(W, H);
@@ -223,6 +233,7 @@ int main() {
             a.observe_mouse();
             a.draw_points();
             DrawCircleV(center, 2.0f, BLUE);
+
             if(a.is_line_done_drawing()) {
                 DrawText("OK / CANCEL", 0, 0, 100, BLACK);
                 Vector2 button_dims{50, 20};
@@ -342,4 +353,13 @@ void draw_to_screen(RenderTexture2D target, int game_screen_width, int game_scre
         WHITE
         );
     EndDrawing();
+}
+void init_window(const int W, const int H) {
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_WINDOW_MAXIMIZED );
+    InitWindow(W, H, "PLANES!!");
+    InitAudioDevice();
+    SetWindowMinSize(640, 360);
+    SetTargetFPS(60);
+    target = LoadRenderTexture(W, H);
+    SetTextureFilter(target.texture, TEXTURE_FILTER_TRILINEAR);
 }
