@@ -109,30 +109,31 @@ public:
     float forward_velocity{};
     std::vector<Vector2> points{};
     float angular_acceleration{};
-    float yaw_angular_speed{};
+    float yaw_angular_velocity{};
     int idx_of_next_point{0};
     Vector3 forward_vec{};
     char yaw_debug_text[100];
     float plane_velocity{10.0f};
+    int direction_turning{}; //1 = right, 0 forward, -1 = left
 
-    void update() {
-        if(idx_of_next_point < points.size() - 1) {
-            Vector2 next_point = points[idx_of_next_point];
-            if(Vector3DistanceSqr(Vector3{position.x, 0, position.z}, Vector3{next_point.y, 0, next_point.x}) < 10 * 10) {
-                ++idx_of_next_point;
-            }
-            needed_angle = atan2f(next_point.y - position.x, next_point.x - position.z);
-            float epsilon = 0.1f;
-            int dir = 1;
-            float ang_dist = 0; //should always be less than 3.1415.
+    //output = (kp*error)+(ki*errorSum)+(kd*dError);
+    float autopilot(float course, float track) {
+        static float error_sum{0};
+        static float previous_error{-INFINITY};
+        float error{course - track};
+        const float kp{1};
+        const float ki{1};
+        const float kd{1};
+        if(previous_error == -INFINITY)
+            previous_error = error;
+        float d_error = (error - previous_error) / GetFrameTime();
+        float output = (kp*error)+(ki*error_sum)+(kd*d_error);
+        error_sum += error * GetFrameTime();
+        previous_error = error;
 
-            //restrict the range of yaw to [-PI, PI], since atan2f's range is that interval.
-            while(yaw < -PI) {
-                yaw += 2 * PI;
-            }
-            while(yaw > PI) {
-                yaw -= 2 * PI;
-            }
+        return output;
+    }
+    void set_direction_and_angular_distance(float &dir, float &ang_dist) {
             if(yaw < 0 && needed_angle > 0) {
                 float right = needed_angle - yaw;
                 float left = PI - needed_angle + PI + yaw;
@@ -162,19 +163,42 @@ public:
                     dir = 1;
                 }
             }
-            float needed_yaw_speed = 2.1f;
-            needed_yaw_speed *= dir;
-            if(yaw_angular_speed > needed_yaw_speed) {
-                angular_acceleration = -.1f;
-            } else if (yaw_angular_speed < needed_yaw_speed) {
-                angular_acceleration = .1f;
+    }
+
+    void update() {
+        if(idx_of_next_point < points.size() - 1) {
+            Vector2 next_point = points[idx_of_next_point];
+            if(Vector3DistanceSqr(Vector3{position.x, 0, position.z}, Vector3{next_point.y, 0, next_point.x}) < 10 * 10) {
+                ++idx_of_next_point;
             }
-            //if(yaw_angular_speed > needed_yaw_speed) {
-                //angular_acceleration = -0.1f;
-            //} else if (yaw_angular_speed < needed_yaw_speed) {
-                //angular_acceleration = 0.1f;
-            //}
-            yaw_angular_speed += angular_acceleration * GetFrameTime();
+            needed_angle = atan2f(next_point.y - position.x, next_point.x - position.z);
+            float epsilon = 0.1f;
+            int dir = 1;
+            float ang_dist = 0; //should always be less than 3.1415.
+
+            //restrict the range of yaw to [-PI, PI], since atan2f's range is that interval.
+            while(yaw < -PI) {
+                yaw += 2 * PI;
+            }
+            while(yaw > PI) {
+                yaw -= 2 * PI;
+            }
+
+            float needed_yaw_velocity = 2.1f;
+            needed_yaw_velocity *= dir;
+            float angular_friction{15.0f};
+            angular_friction *= -dir;
+            angular_acceleration = 16.0f;
+            angular_acceleration *= dir;
+            static bool turn_flag{false};
+
+            float output = autopilot(needed_angle, yaw);
+
+            float net_angular_force = 0;
+            if(angular_acceleration != 0) {
+                net_angular_force = angular_friction + angular_acceleration;
+            }
+            yaw_angular_velocity += net_angular_force * GetFrameTime();
             if(abs(ang_dist) > epsilon) {
                 if(dir < 0) {
                     const char *d = TextFormat("TURNING LEFT, angle needed: %.5f, yaw: %.5f, ang_dist: %.5f", needed_angle, yaw, ang_dist);
@@ -186,7 +210,7 @@ public:
                 }
             }
 
-                yaw += yaw_angular_speed * GetFrameTime();
+            yaw += yaw_angular_velocity * GetFrameTime();
             Vector2 vec = Vector2{sin(yaw), cos(yaw)};
             forward_vec =Vector3{vec.x, 0, vec.y};
             position += forward_vec * plane_velocity * GetFrameTime();
