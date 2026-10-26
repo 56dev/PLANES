@@ -117,23 +117,30 @@ public:
     int direction_turning{}; //1 = right, 0 forward, -1 = left
 
     //output = (kp*error)+(ki*errorSum)+(kd*dError);
-    float autopilot(float course, float track) {
+    float autopilot(float error) {
         static float error_sum{0};
         static float previous_error{-INFINITY};
-        float error{course - track};
-        const float kp{1};
-        const float ki{1};
-        const float kd{1};
+
+        const float kp{2.5};
+        const float ki{0};
+        const float kd{2};
         if(previous_error == -INFINITY)
             previous_error = error;
-        float d_error = (error - previous_error) / GetFrameTime();
-        float output = (kp*error)+(ki*error_sum)+(kd*d_error);
+        const float IMAX{0.6};
+        float d_error = atan2f(sinf(error - previous_error), cosf(error - previous_error))/ GetFrameTime();
         error_sum += error * GetFrameTime();
+        if(error_sum > IMAX) {
+            error_sum = IMAX;
+        } else if(error_sum < -IMAX) {
+            error_sum = -IMAX;
+        }
+        float output = (kp*error)+(ki*error_sum)+(kd*d_error);
+
         previous_error = error;
 
         return output;
     }
-    void set_direction_and_angular_distance(float &dir, float &ang_dist) {
+    void set_direction_and_angular_distance(int &dir, float &ang_dist) {
             if(yaw < 0 && needed_angle > 0) {
                 float right = needed_angle - yaw;
                 float left = PI - needed_angle + PI + yaw;
@@ -168,14 +175,14 @@ public:
     void update() {
         if(idx_of_next_point < points.size() - 1) {
             Vector2 next_point = points[idx_of_next_point];
-            if(Vector3DistanceSqr(Vector3{position.x, 0, position.z}, Vector3{next_point.y, 0, next_point.x}) < 10 * 10) {
+            if(Vector3DistanceSqr(Vector3{position.x, 0, position.z}, Vector3{next_point.y, 0, next_point.x}) < 20 * 20) {
                 ++idx_of_next_point;
             }
             needed_angle = atan2f(next_point.y - position.x, next_point.x - position.z);
             float epsilon = 0.1f;
             int dir = 1;
             float ang_dist = 0; //should always be less than 3.1415.
-
+            set_direction_and_angular_distance(dir, ang_dist);
             //restrict the range of yaw to [-PI, PI], since atan2f's range is that interval.
             while(yaw < -PI) {
                 yaw += 2 * PI;
@@ -192,13 +199,18 @@ public:
             angular_acceleration *= dir;
             static bool turn_flag{false};
 
-            float output = autopilot(needed_angle, yaw);
+            float output = autopilot(ang_dist * dir);
 
             float net_angular_force = 0;
-            if(angular_acceleration != 0) {
-                net_angular_force = angular_friction + angular_acceleration;
-            }
+
+            net_angular_force = output;
             yaw_angular_velocity += net_angular_force * GetFrameTime();
+            if(yaw_angular_velocity > 10.0f) {
+                yaw_angular_velocity = 10.0f;
+            } else if(yaw_angular_velocity < -10.0f) {
+                yaw_angular_velocity = -10.0f;
+            }
+            yaw += yaw_angular_velocity * GetFrameTime();
             if(abs(ang_dist) > epsilon) {
                 if(dir < 0) {
                     const char *d = TextFormat("TURNING LEFT, angle needed: %.5f, yaw: %.5f, ang_dist: %.5f", needed_angle, yaw, ang_dist);
@@ -210,7 +222,6 @@ public:
                 }
             }
 
-            yaw += yaw_angular_velocity * GetFrameTime();
             Vector2 vec = Vector2{sin(yaw), cos(yaw)};
             forward_vec =Vector3{vec.x, 0, vec.y};
             position += forward_vec * plane_velocity * GetFrameTime();
