@@ -115,6 +115,11 @@ public:
     char yaw_debug_text[100];
     float plane_velocity{10.0f};
     int direction_turning{}; //1 = right, 0 forward, -1 = left
+    Model model{};
+
+    plane() {
+        model = LoadModel("./models/uavsar.glb");
+    }
 
     //output = (kp*error)+(ki*errorSum)+(kd*dError);
     float autopilot(float error) {
@@ -231,6 +236,7 @@ public:
 
     }
     void render_plane() {
+        DrawModelEx(model, position, Vector3{0, 1, 0}, yaw * RAD2DEG, Vector3One() * 100, WHITE);
         static Vector3 up{0, 1, 0};
         static Vector3 right{1, 0, 0};
         static Vector3 forward{0, 0, 1};
