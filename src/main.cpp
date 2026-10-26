@@ -207,6 +207,7 @@ public:
             float output = autopilot(ang_dist * dir);
 
             float net_angular_force = 0;
+            roll = output * 0.7f;
 
             net_angular_force = output;
             yaw_angular_velocity += net_angular_force * GetFrameTime();
@@ -236,7 +237,10 @@ public:
 
     }
     void render_plane() {
-        DrawModelEx(model, position, Vector3{0, 1, 0}, yaw * RAD2DEG, Vector3One() * 100, WHITE);
+        Matrix transform = MatrixRotateXYZ(Vector3{pitch, yaw, roll});
+        model.transform = transform;
+        DrawModel(model, position, 100.0f, WHITE);
+        //DrawModelEx(model, position, Vector3{0, 1, 0}, yaw * RAD2DEG, Vector3One() * 100, WHITE);
         static Vector3 up{0, 1, 0};
         static Vector3 right{1, 0, 0};
         static Vector3 forward{0, 0, 1};
