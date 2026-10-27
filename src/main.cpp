@@ -145,10 +145,10 @@ public:
 
         return output;
     }
-    void set_direction_and_angular_distance(int &dir, float &ang_dist) {
-            if(yaw < 0 && needed_angle > 0) {
-                float right = needed_angle - yaw;
-                float left = PI - needed_angle + PI + yaw;
+    void set_direction_and_angular_distance(float a, float b, int &dir, float &ang_dist) {
+            if(a < 0 && b > 0) {
+                float right = b - a;
+                float left = PI - b + PI + a;
                 if(left < right) {
                     dir = -1;
                     ang_dist = left;
@@ -156,9 +156,9 @@ public:
                     dir = 1;
                     ang_dist = right;
                 }
-            } else if (yaw > 0 && needed_angle < 0) {
-                float left = yaw - needed_angle;
-                float right = PI - yaw + PI + needed_angle;
+            } else if (a > 0 && b < 0) {
+                float left = a - b;
+                float right = PI - a + PI + b;
                 if(left < right) {
                     dir = -1;
                     ang_dist = left;
@@ -168,26 +168,44 @@ public:
                 }
 
             } else {
-                ang_dist = abs(yaw - needed_angle);
-                if(yaw > needed_angle) {
+                ang_dist = abs(a - b);
+                if(a > b) {
                     dir = -1;
                 } else {
                     dir = 1;
                 }
             }
     }
+    void adjust_needed_angle(float at) {
+        while(needed_angle < -PI) {
+            needed_angle += 2 * PI;
+        }
+        while(needed_angle > PI) {
+            needed_angle -= 2 * PI;
+        }
+        int dir{0};
+        float ang_dist{0};
+        constexpr float epsilon = 0.01f;
+        set_direction_and_angular_distance(needed_angle, at, dir, ang_dist);
+        if(abs(ang_dist) <= epsilon) {
+            return;
+        }
+        constexpr float ang_speed{0.5f};
+        needed_angle += dir * ang_speed * GetFrameTime();
 
+    }
     void update() {
         if(idx_of_next_point < points.size() - 1) {
             Vector2 next_point = points[idx_of_next_point];
             if(Vector3DistanceSqr(Vector3{position.x, 0, position.z}, Vector3{next_point.y, 0, next_point.x}) < 20 * 20) {
                 ++idx_of_next_point;
             }
-            needed_angle = atan2f(next_point.y - position.x, next_point.x - position.z);
+            float na = atan2f(next_point.y - position.x, next_point.x - position.z);
+            adjust_needed_angle(na);
             float epsilon = 0.1f;
             int dir = 1;
             float ang_dist = 0; //should always be less than 3.1415.
-            set_direction_and_angular_distance(dir, ang_dist);
+            set_direction_and_angular_distance(yaw, needed_angle, dir, ang_dist);
             //restrict the range of yaw to [-PI, PI], since atan2f's range is that interval.
             while(yaw < -PI) {
                 yaw += 2 * PI;
@@ -204,13 +222,18 @@ public:
             angular_acceleration *= dir;
             static bool turn_flag{false};
 
-            float output = autopilot(ang_dist * dir);
+            float output = autopilot(ang_dist * dir) * 0.89f;
 
             float net_angular_force = 0;
-            roll = output * 0.7f;
+            //roll = output * 0.7f;
 
             net_angular_force = output;
             yaw_angular_velocity += net_angular_force * GetFrameTime();
+            constexpr float max_yav{20.0f};
+            if(yaw_angular_velocity > max_yav) {
+                yaw_angular_velocity = max_yav;
+            }
+            roll = -yaw_angular_velocity * 0.7f;
             if(yaw_angular_velocity > 10.0f) {
                 yaw_angular_velocity = 10.0f;
             } else if(yaw_angular_velocity < -10.0f) {
@@ -231,6 +254,8 @@ public:
             Vector2 vec = Vector2{sin(yaw), cos(yaw)};
             forward_vec =Vector3{vec.x, 0, vec.y};
             position += forward_vec * plane_velocity * GetFrameTime();
+            constexpr float altitude{10.0f};
+            position.y = altitude;
         }
 
 
@@ -308,11 +333,13 @@ int main() {
                 p.update();
                 p.render_plane();
                 update_camera(camera, p.position);
+                /*
                 for(std::size_t i = 0; i < points_on_world.size(); ++i) {
                     Color col = p.idx_of_next_point == i ? RED : GREEN;
                     DrawSphere(Vector3{points_on_world[i].y, 0, points_on_world[i].x}, 3.0f, col);
                     DrawCircle3D(Vector3{points_on_world[i].y, 0, points_on_world[i].x}, 10.0f, (Vector3){1.0, 0.0, 0.0f}, 90,BLACK);
                 }
+                    */
                 DrawGrid(1000, 10.0f);
             EndMode3D();
             DrawText(p.yaw_debug_text, 0, 0, 30, BLACK);
