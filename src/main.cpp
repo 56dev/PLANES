@@ -100,6 +100,7 @@ struct artist {
 class plane {
 private:
     float needed_angle{};
+    float needed_altitude{};
 public:
     Vector3 position{};
     // all in radians
@@ -256,10 +257,16 @@ public:
         Vector2 vec = Vector2{sin(yaw), cos(yaw)};
         forward_vec =Vector3{vec.x, 0, vec.y};
         position += forward_vec * plane_velocity * GetFrameTime();
-        constexpr float altitude{10.0f};
-        position.y = altitude;
+        if(position.y < needed_altitude) {
+            position.y += 10.0f * GetFrameTime();
+        } else if (position.y > needed_altitude) {
+            position.y -= 10.0f * GetFrameTime();
+        }
 
 
+    }
+    void set_altitude(float alt) {
+        needed_altitude = alt;
     }
     void render_plane() {
         Matrix transform = MatrixRotateXYZ(Vector3{pitch, yaw, roll});
@@ -285,6 +292,65 @@ public:
         UpdateCamera(&camera, CAMERA_CUSTOM);
     }
 };
+class UIElements {
+private:
+    float screen_H{};
+    float screen_W{};
+    struct AltitudeShift {
+        bool being_held{false};
+    };
+    AltitudeShift altitude_shift{};
+public:
+    UIElements(float W, float H): screen_H{H}, screen_W{W} {}
+    bool is_mouse_on_element(Rectangle rec) {
+        return CheckCollisionPointRec(GetMousePosition(), rec);
+    }
+    bool did_mouse_begin_pressing_element(Rectangle rec) {
+       return is_mouse_on_element(rec) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    }
+    bool did_mouse_stop_pressing() {
+        return IsMouseButtonUp(MOUSE_BUTTON_LEFT);
+    }
+    float update_altitude_speed() {
+        constexpr float h = 300;
+        constexpr float w = 100;
+        constexpr float w_s = 200;
+        constexpr float h_s = 20;
+
+        Rectangle rec = {
+            screen_W - w,
+            screen_H / 2 - h / 2,
+            w, h
+        };
+
+        Rectangle shift{
+            screen_W - w_s,
+            screen_H / 2 - h_s / 2,
+            w_s, h_s
+        };
+        if(did_mouse_begin_pressing_element(rec)) {
+            altitude_shift.being_held = true;
+
+        } else if (did_mouse_stop_pressing()) {
+            altitude_shift.being_held = false;
+        }
+        if(altitude_shift.being_held) {
+            shift.y = GetMousePosition().y - shift.height / 2;
+            shift.y = Clamp(shift.y, rec.y, rec.y + h - h_s);
+
+        }
+        DrawRectangleRec(rec, BLACK);
+        Color col_of_rec = is_mouse_on_element(shift) ? RED : GREEN;
+        DrawRectangleRec(shift, col_of_rec);
+
+
+        constexpr float max_speed{10.0f};
+        float d1 = rec.height;
+        float d2 = (shift.y + shift.height/2) - rec.y;
+        float p = (d2 / d1 * (max_speed * 2));
+        return max_speed - p;
+    }
+};
 int main() {
     constexpr int W{1920};
     constexpr int H{1080};
@@ -296,6 +362,7 @@ int main() {
     artist a{W, H, true, center};
     std::vector<Vector2> points_on_world{};
     plane p{};
+    UIElements ui{W,H};
 
     FlyState fly_state{FlyState::DRAW};
 
@@ -332,12 +399,13 @@ int main() {
                 if(GuiButton(button_2, "CANCEL")) {
                     a.reset();
                 }
-        }
+            }
         } else if (fly_state == FlyState::FLY) {
             BeginMode3D(camera);
                 p.update();
                 p.render_plane();
                 p.update_camera(camera);
+
                 /*
                 for(std::size_t i = 0; i < points_on_world.size(); ++i) {
                     Color col = p.idx_of_next_point == i ? RED : GREEN;
@@ -348,6 +416,8 @@ int main() {
                 DrawGrid(1000, 10.0f);
             EndMode3D();
             DrawText(p.yaw_debug_text, 0, 0, 30, BLACK);
+            float as = ui.update_altitude_speed();
+            printf("%.2f\n", as);
 
         }
 
