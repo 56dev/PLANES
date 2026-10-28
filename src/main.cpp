@@ -251,13 +251,13 @@ public:
                 }
             }
 
-            Vector2 vec = Vector2{sin(yaw), cos(yaw)};
-            forward_vec =Vector3{vec.x, 0, vec.y};
-            position += forward_vec * plane_velocity * GetFrameTime();
-            constexpr float altitude{10.0f};
-            position.y = altitude;
-        }
 
+        }
+        Vector2 vec = Vector2{sin(yaw), cos(yaw)};
+        forward_vec =Vector3{vec.x, 0, vec.y};
+        position += forward_vec * plane_velocity * GetFrameTime();
+        constexpr float altitude{10.0f};
+        position.y = altitude;
 
 
     }
@@ -278,6 +278,11 @@ public:
 
 
 
+    }
+    void update_camera(Camera &camera) {
+        camera.target = position;
+        camera.position = position + Vector3{-forward_vec.x * 40.0f, position.y + 10.0f, -forward_vec.z * 40.0f};
+        UpdateCamera(&camera, CAMERA_CUSTOM);
     }
 };
 int main() {
@@ -332,7 +337,7 @@ int main() {
             BeginMode3D(camera);
                 p.update();
                 p.render_plane();
-                update_camera(camera, p.position);
+                p.update_camera(camera);
                 /*
                 for(std::size_t i = 0; i < points_on_world.size(); ++i) {
                     Color col = p.idx_of_next_point == i ? RED : GREEN;
