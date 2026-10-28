@@ -257,16 +257,17 @@ public:
         Vector2 vec = Vector2{sin(yaw), cos(yaw)};
         forward_vec =Vector3{vec.x, 0, vec.y};
         position += forward_vec * plane_velocity * GetFrameTime();
-        if(position.y < needed_altitude) {
+        bool approx_equal = abs(position.y - needed_altitude) < 1.0f;
+        if(position.y < needed_altitude && !approx_equal) {
             position.y += 10.0f * GetFrameTime();
-        } else if (position.y > needed_altitude) {
+        } else if (position.y > needed_altitude && !approx_equal) {
             position.y -= 10.0f * GetFrameTime();
         }
 
 
     }
-    void set_altitude(float alt) {
-        needed_altitude = alt;
+    void update_altitude(float as) {
+        needed_altitude += as * GetFrameTime();
     }
     void render_plane() {
         Matrix transform = MatrixRotateXYZ(Vector3{pitch, yaw, roll});
@@ -417,7 +418,7 @@ int main() {
             EndMode3D();
             DrawText(p.yaw_debug_text, 0, 0, 30, BLACK);
             float as = ui.update_altitude_speed();
-            printf("%.2f\n", as);
+            p.update_altitude(as);
 
         }
 
