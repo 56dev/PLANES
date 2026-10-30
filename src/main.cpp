@@ -100,8 +100,8 @@ struct artist {
 class plane {
 private:
     float needed_angle{};
-    float needed_altitude{};
 public:
+    float needed_altitude{};
     Vector3 position{};
     // all in radians
     float yaw{};
@@ -258,8 +258,10 @@ public:
         forward_vec =Vector3{vec.x, 0, vec.y};
         position += forward_vec * plane_velocity * GetFrameTime();
         bool approx_equal = abs(position.y - needed_altitude) < 1.0f;
+        pitch = abs(position.y - needed_altitude) * 0.1f;
         float plus = fmin(10.0f, abs(position.y - needed_altitude));
         if(position.y < needed_altitude && !approx_equal) {
+            pitch *= -1;
             position.y += plus * GetFrameTime();
         } else if (position.y > needed_altitude && !approx_equal) {
             position.y -= plus * GetFrameTime();
@@ -351,11 +353,14 @@ public:
         float p = (d2 / d1 * (max_speed * 2));
         return max_speed - p;
     }
-    void display_altitude(float a) {
+    void display_altitude(float a, float na) {
         const char *tf = TextFormat("%.0f", a);
+        const char *tfna = TextFormat("%.0f", na);
         constexpr float fs{13.0f};
         Vector2 s = MeasureTextEx(GetFontDefault(), tf, fs, 1);
+        Vector2 sna = MeasureTextEx(GetFontDefault(),tfna, fs, 1 );
         DrawTextEx(GetFontDefault(), tf, Vector2{screen_W  - s.x, screen_H / 2 - altitude_shift.h /2 - s.y}, fs, 1, BLACK);
+        DrawTextEx(GetFontDefault(), tfna, Vector2{screen_W  - sna.x, screen_H / 2 - altitude_shift.h /2 - s.y - sna.y}, fs, 1, BLACK);
 
     }
 };
@@ -426,7 +431,7 @@ int main() {
             DrawText(p.yaw_debug_text, 0, 0, 30, BLACK);
             float as = ui.update_altitude_speed();
             p.update_altitude(as);
-            ui.display_altitude(p.position.y);
+            ui.display_altitude(p.position.y, p.needed_altitude);
 
         }
 
