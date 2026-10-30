@@ -258,10 +258,11 @@ public:
         forward_vec =Vector3{vec.x, 0, vec.y};
         position += forward_vec * plane_velocity * GetFrameTime();
         bool approx_equal = abs(position.y - needed_altitude) < 1.0f;
+        float plus = fmin(10.0f, abs(position.y - needed_altitude));
         if(position.y < needed_altitude && !approx_equal) {
-            position.y += 10.0f * GetFrameTime();
+            position.y += plus * GetFrameTime();
         } else if (position.y > needed_altitude && !approx_equal) {
-            position.y -= 10.0f * GetFrameTime();
+            position.y -= plus * GetFrameTime();
         }
 
 
@@ -289,7 +290,7 @@ public:
     }
     void update_camera(Camera &camera) {
         camera.target = position;
-        camera.position = position + Vector3{-forward_vec.x * 40.0f, position.y + 10.0f, -forward_vec.z * 40.0f};
+        camera.position = position + Vector3{-forward_vec.x * 40.0f, 10.0f, -forward_vec.z * 40.0f};
         UpdateCamera(&camera, CAMERA_CUSTOM);
     }
 };
@@ -299,6 +300,8 @@ private:
     float screen_W{};
     struct AltitudeShift {
         bool being_held{false};
+        float h{300};
+        float w{100};
     };
     AltitudeShift altitude_shift{};
 public:
@@ -313,15 +316,13 @@ public:
         return IsMouseButtonUp(MOUSE_BUTTON_LEFT);
     }
     float update_altitude_speed() {
-        constexpr float h = 300;
-        constexpr float w = 100;
         constexpr float w_s = 200;
         constexpr float h_s = 20;
 
         Rectangle rec = {
-            screen_W - w,
-            screen_H / 2 - h / 2,
-            w, h
+            screen_W - altitude_shift.w,
+            screen_H / 2 - altitude_shift.h / 2,
+            altitude_shift.w, altitude_shift.h
         };
 
         Rectangle shift{
@@ -337,12 +338,11 @@ public:
         }
         if(altitude_shift.being_held) {
             shift.y = GetMousePosition().y - shift.height / 2;
-            shift.y = Clamp(shift.y, rec.y, rec.y + h - h_s);
+            shift.y = Clamp(shift.y, rec.y, rec.y + altitude_shift.h - h_s);
 
         }
         DrawRectangleRec(rec, BLACK);
-        Color col_of_rec = is_mouse_on_element(shift) ? RED : GREEN;
-        DrawRectangleRec(shift, col_of_rec);
+        DrawRectangleRec(shift, GREEN);
 
 
         constexpr float max_speed{10.0f};
@@ -350,6 +350,13 @@ public:
         float d2 = (shift.y + shift.height/2) - rec.y;
         float p = (d2 / d1 * (max_speed * 2));
         return max_speed - p;
+    }
+    void display_altitude(float a) {
+        const char *tf = TextFormat("%.0f", a);
+        constexpr float fs{13.0f};
+        Vector2 s = MeasureTextEx(GetFontDefault(), tf, fs, 1);
+        DrawTextEx(GetFontDefault(), tf, Vector2{screen_W  - s.x, screen_H / 2 - altitude_shift.h /2 - s.y}, fs, 1, BLACK);
+
     }
 };
 int main() {
@@ -419,6 +426,7 @@ int main() {
             DrawText(p.yaw_debug_text, 0, 0, 30, BLACK);
             float as = ui.update_altitude_speed();
             p.update_altitude(as);
+            ui.display_altitude(p.position.y);
 
         }
 
