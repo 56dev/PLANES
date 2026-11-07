@@ -240,6 +240,13 @@ public:
             } else if(yaw_angular_velocity < -10.0f) {
                 yaw_angular_velocity = -10.0f;
             }
+            float diff = abs(needed_altitude - position.y);
+            diff = diff / 10.0f;
+            diff = Clamp(diff, 0, 1);
+            //TraceLog(LOG_INFO, TextFormat("%.2f", diff * 100));
+            pitch = PI / 6 * diff;
+            TraceLog(LOG_INFO, TextFormat("%.2f", pitch * RAD2DEG));
+
             yaw += yaw_angular_velocity * GetFrameTime();
             if(abs(ang_dist) > epsilon) {
                 if(dir < 0) {
@@ -258,10 +265,9 @@ public:
         forward_vec =Vector3{vec.x, 0, vec.y};
         position += forward_vec * plane_velocity * GetFrameTime();
         bool approx_equal = abs(position.y - needed_altitude) < 1.0f;
-        pitch = abs(position.y - needed_altitude) * 0.1f;
+        //pitch = abs(position.y - needed_altitude) * 0.1f;
         float plus = fmin(10.0f, abs(position.y - needed_altitude));
         if(position.y < needed_altitude && !approx_equal) {
-            pitch *= -1;
             position.y += plus * GetFrameTime();
         } else if (position.y > needed_altitude && !approx_equal) {
             position.y -= plus * GetFrameTime();
@@ -273,7 +279,15 @@ public:
         needed_altitude += as * GetFrameTime();
     }
     void render_plane() {
-        Matrix transform = MatrixRotateXYZ(Vector3{pitch, yaw, roll});
+        Quaternion current_rotation = QuaternionIdentity();
+        Quaternion p = QuaternionFromAxisAngle((Vector3){1.0f, 0.0f, 0.0f}, pitch);
+        Quaternion y = QuaternionFromAxisAngle((Vector3){0.0f, 1.0f, 0.0f}, yaw);
+        Quaternion r = QuaternionFromAxisAngle((Vector3){0.0f, 0.0f, 1.0f}, roll);
+        current_rotation = QuaternionMultiply(r, current_rotation);
+        current_rotation = QuaternionMultiply(p, current_rotation);
+        current_rotation = QuaternionMultiply(current_rotation, y);
+
+        Matrix transform = QuaternionToMatrix(current_rotation);
         model.transform = transform;
         DrawModel(model, position, 100.0f, WHITE);
         //DrawModelEx(model, position, Vector3{0, 1, 0}, yaw * RAD2DEG, Vector3One() * 100, WHITE);
