@@ -4,6 +4,7 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 #include <vector>
+#include <algorithm>
 
 float adjust_mouse(int, int);
 void draw_to_screen(RenderTexture2D, int, int, float);
@@ -100,6 +101,12 @@ struct artist {
 class plane {
 private:
     float needed_angle{};
+
+    float yaw_error_sum{0};
+    float yaw_previous_error{-INFINITY};
+
+    float pitch_error_sum{0};
+    float pitch_previous_error{-INFINITY};
 public:
     float needed_altitude{};
     Vector3 position{};
@@ -118,14 +125,18 @@ public:
     int direction_turning{}; //1 = right, 0 forward, -1 = left
     Model model{};
 
+    float yaw_d{};
+    float pitch_d{};
+    float roll_d{};
+    Quaternion current_rotation{};
+
     plane() {
         model = LoadModel("./models/uavsar.glb");
+        current_rotation = QuaternionIdentity();
     }
 
     //output = (kp*error)+(ki*errorSum)+(kd*dError);
-    float autopilot(float error) {
-        static float error_sum{0};
-        static float previous_error{-INFINITY};
+    float autopilot(float error, float &error_sum, float &previous_error) {
 
         const float kp{2.5};
         const float ki{0};
@@ -223,7 +234,7 @@ public:
             angular_acceleration *= dir;
             static bool turn_flag{false};
 
-            float output = autopilot(ang_dist * dir) * 0.89f;
+            float output = autopilot(ang_dist * dir, yaw_error_sum, yaw_previous_error) * 0.89f;
 
             float net_angular_force = 0;
             //roll = output * 0.7f;
@@ -234,19 +245,33 @@ public:
             if(yaw_angular_velocity > max_yav) {
                 yaw_angular_velocity = max_yav;
             }
-            roll = -yaw_angular_velocity * 0.7f;
             if(yaw_angular_velocity > 10.0f) {
                 yaw_angular_velocity = 10.0f;
             } else if(yaw_angular_velocity < -10.0f) {
                 yaw_angular_velocity = -10.0f;
             }
-            float diff = abs(needed_altitude - position.y);
-            diff = diff / 10.0f;
-            diff = Clamp(diff, 0, 1);
-            //TraceLog(LOG_INFO, TextFormat("%.2f", diff * 100));
-            pitch = PI / 6 * diff;
-            TraceLog(LOG_INFO, TextFormat("%.2f", pitch * RAD2DEG));
 
+            float altit_dist = needed_altitude - position.y;
+            float needed_pitch{};
+            if(abs(altit_dist) < 3.0f) {
+                needed_pitch = 0;
+            } else if(altit_dist > 0) {
+                needed_pitch = -PI / 12;
+            } else if (altit_dist < 0) {
+                needed_pitch = PI / 12;
+            }
+            float pitch_dist = needed_pitch - pitch;
+            float p_out = autopilot(pitch_dist, pitch_error_sum, pitch_previous_error);
+            float pitch_accel = p_out;
+            static float pitch_vel{0};
+            pitch_vel += pitch_accel * GetFrameTime();
+            pitch_vel = Clamp(pitch_vel, -PI/6, PI/6);
+            pitch_d = pitch_vel * GetFrameTime();
+
+            pitch += pitch_d;
+            TraceLog(LOG_INFO, TextFormat("%.2f", pitch * RAD2DEG));
+            TraceLog(LOG_INFO, TextFormat("%.2f", needed_pitch * RAD2DEG));
+            yaw_d = yaw_angular_velocity * GetFrameTime();
             yaw += yaw_angular_velocity * GetFrameTime();
             if(abs(ang_dist) > epsilon) {
                 if(dir < 0) {
@@ -283,9 +308,9 @@ public:
         Quaternion p = QuaternionFromAxisAngle((Vector3){1.0f, 0.0f, 0.0f}, pitch);
         Quaternion y = QuaternionFromAxisAngle((Vector3){0.0f, 1.0f, 0.0f}, yaw);
         Quaternion r = QuaternionFromAxisAngle((Vector3){0.0f, 0.0f, 1.0f}, roll);
-        current_rotation = QuaternionMultiply(r, current_rotation);
-        current_rotation = QuaternionMultiply(p, current_rotation);
-        current_rotation = QuaternionMultiply(current_rotation, y);
+        Quaternion delta = QuaternionMultiply(QuaternionMultiply(y, p), r);
+
+        current_rotation = QuaternionMultiply(current_rotation, delta);
 
         Matrix transform = QuaternionToMatrix(current_rotation);
         model.transform = transform;
